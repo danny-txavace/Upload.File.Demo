@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+option csharp_namespace = "Libs.Core.Public.Protos.Upload.File.Service";
+
+package uploadFile;
+
+service UploadFileGrpc {
+  rpc UploadFlyer (stream GrpcUploadFlyerRequest)
+      returns (GrpcUploadFlyerResponse);
+}
+
+message GrpcUploadFlyerRequest {
+  bytes content = 1;
+  string file_name = 2;
+  string content_type = 3;
+}
+
+message GrpcUploadFlyerResponse {
+  bool is_success = 1;
+  string message = 2;
+}

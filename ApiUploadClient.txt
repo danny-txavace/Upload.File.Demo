@@ -1,0 +1,52 @@
+using ApiGateway.src.Interfaces;
+using Google.Protobuf;
+using Grpc.Core;
+using Libs.Core.Public.Protos.Upload.File.Service;
+using Libs.Core.Shared.src.DTOs.Responses;
+
+namespace ApiGateway.src.Services;
+
+public sealed class UploadFileGrpcServiceClient (UploadFileGrpc.UploadFileGrpcClient client, ILogger<UploadFileGrpcServiceClient> logger) : IUploadFileGrpcServiceClient
+{
+    private readonly UploadFileGrpc.UploadFileGrpcClient _client = client;
+    private readonly ILogger<UploadFileGrpcServiceClient> _logger = logger;
+
+    public async Task<ResponseDTO> UploadFlyerAsync(IFormFile file, CancellationToken ct)
+    {
+        byte[] fileBytes;
+        using (var memoryStream = new MemoryStream())
+        {
+            await file.CopyToAsync(memoryStream, ct);
+            fileBytes = memoryStream.ToArray();
+        }
+
+        var grpcRequest = new GrpcUploadFlyerRequest
+        {
+            Content = ByteString.CopyFrom(fileBytes),
+            FileName = file.FileName,
+            ContentType = file.ContentType
+        };
+
+        try
+        {
+            // Start the client streaming call
+            using var call = _client.UploadFlyer(cancellationToken: ct);
+
+            await call.RequestStream.WriteAsync(grpcRequest, ct);
+            await call.RequestStream.CompleteAsync();
+
+            var grpcResponse = await call.ResponseAsync;
+
+            return new ResponseDTO
+            {
+                IsSuccess = grpcResponse.IsSuccess,
+                Message = grpcResponse.Message
+            };
+        }
+        catch (RpcException ex)
+        {
+            _logger.LogError(ex, "- UploadFileGrpcServiceClient -> UploadFlyerAsync(...)");
+            return new ResponseDTO { IsSuccess = false, Message = ex.Status.Detail };
+        }
+    }
+}
